@@ -129,3 +129,11 @@ output env array=[
   'Storage account name: ${storageAccount.name}'
   'Storage container name: ${blobContainer.name}'
 ]
+// Container Registry
+output containerRegistry string=registryName
+output containerRegistryUsername string=registryUsername
+
+// Application URLs
+output albumApiUrl string=albumServiceCapp.outputs.fqdn
+output albumViewerUrl string=albumViewerCapp.outputs.fqdn
+

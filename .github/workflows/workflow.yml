@@ -1,0 +1,49 @@
+# GitHub Action workflow that runs on push to main branch
+# Docker build and push the album-api image to ACR
+name: Build and Push Album API Docker Image
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      # tag the image with the GitHub run id and push to docker hub
+      - name: Build and push Docker image
+        id: build-and-push
+        uses: docker/build-push-action@v4
+        with:
+            context: ./albums-api
+            push: true
+            tags: your-dockerhub-username/albums-api:latest
+      # run tests on the album-api image 
+      - name: Run tests
+        run: |
+          docker run your-dockerhub-username/albums-api:latest dotnet test /app/tests/AlbumApi.Tests/AlbumApi.Tests.csproj        
+      - name: Image digest
+        run: echo ${{ steps.build-and-push.outputs.digest }}
+      # deploy the album-api image to the dev AKS cluster
+      - name: Deploy to AKS
+        uses: azure/aks-deploy@v1
+        with:
+            resource-group: your-resource-group
+            cluster-name: your-aks-cluster
+            namespace: default
+            manifests: ./k8s/deployment.yaml
+            images: your-dockerhub-username/albums-api:latest
+            imagepullsecrets: your-image-pull-secret
+            strategy: rolling
+            rollout-restart: true
+            wait-for-rollout: true
+            timeout-seconds: 600
+            kubeconfig: ${{ secrets.AKS_KUBECONFIG }}
+            azure-subscription: ${{ secrets.AZURE_SUBSCRIPTION }}
+            azure-credentials: ${{ secrets.AZURE_CREDENTIALS }}
+
+    # find and replace the %%VERSION%% by the GitHub action run id in every appmanifest.yml file
+      - name: Update version in manifests
+        run: |
+          find ./k8s -type f -name "deployment.yaml" -exec sed -i "s/%%VERSION%%/${{ github.run_id }}/g" {} + 

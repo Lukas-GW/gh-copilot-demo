@@ -1,4 +1,49 @@
 ############################################
+## INFRASTRUCTURE                         ##
+############################################
+
+resource "azurerm_resource_group" "rg" {
+  name     = "rg-albums-${local.unique_suffix}"
+  location = "West Europe"
+}
+
+locals {
+  unique_suffix                      = "demo"
+  mssql_server_administrator_login   = "admin"
+  mssql_server_administrator_login_password = "Password123!"
+  mssql_database_name                = "albumsdb"
+  apipoi_base_image_tag              = "1.0"
+  apitrips_base_image_tag             = "1.0"
+  apiuserjava_base_image_tag          = "1.0"
+  apiuserprofile_base_image_tag       = "1.0"
+}
+
+resource "azurerm_mssql_server" "mssql_server" {
+  name                         = "sql-${local.unique_suffix}"
+  resource_group_name          = azurerm_resource_group.rg.name
+  location                     = azurerm_resource_group.rg.location
+  version                      = "12.0"
+  administrator_login          = local.mssql_server_administrator_login
+  administrator_login_password = local.mssql_server_administrator_login_password
+}
+
+resource "azurerm_mssql_database" "mssql_database" {
+  name           = local.mssql_database_name
+  server_id      = azurerm_mssql_server.mssql_server.id
+  collation      = "SQL_Latin1_General_CP1_CI_AS"
+  license_type   = "BasePrice"
+  max_size_gb    = 2
+  sku_name       = "Basic"
+}
+
+resource "azurerm_mssql_firewall_rule" "allow_azure_services" {
+  name             = "AllowAzureServices"
+  server_id        = azurerm_mssql_server.mssql_server.id
+  start_ip_address = "0.0.0.0"
+  end_ip_address   = "0.0.0.0"
+}
+
+############################################
 ## DATABASE                               ##
 ############################################
 
@@ -61,4 +106,22 @@ resource "null_resource" "docker_api-userprofile" {
   provisioner "local-exec" {
     command = "az acr build --image devopsoh/api-userprofile:${local.apiuserprofile_base_image_tag} --registry ${azurerm_container_registry.container_registry.login_server} --build-arg build_version=${local.apiuserprofile_base_image_tag} --file ../../apis/userprofile/Dockerfile ../../apis/userprofile"
   }
+}
+
+# Container Registry
+resource "azurerm_container_registry" "container_registry" {
+  name                = "acr${local.unique_suffix}"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = azurerm_resource_group.rg.location
+  sku                 = "Standard"
+  admin_enabled       = true
+}
+
+# Azure Open AI resource
+resource "azurerm_cognitive_account" "openai" {
+  name                = "openai-${local.unique_suffix}"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  kind                = "OpenAI"
+  sku_name            = "S0"
 }

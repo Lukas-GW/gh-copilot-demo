@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using System.Text.Json;
 using System.Text;
+using System.Linq;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -25,8 +26,29 @@ namespace albums_api.Controllers
         [HttpGet("{id}")]
         public IActionResult Get(int id)
         {
-            return Ok();
+            var album = Album.GetById(id);
+            if (album == null)
+            {
+                return NotFound();
+            }
+            return Ok(album);
         }
 
+        // GET api/albums/sorted?sortBy=title
+        [HttpGet("sorted")]
+        public IActionResult GetSorted(string sortBy = "title")
+        {
+            var albums = Album.GetAll();
+
+            var sortedAlbums = sortBy.ToLower() switch
+            {
+                "title" => albums.OrderBy(a => a.Title),
+                "artist" => albums.OrderBy(a => a.Artist),
+                "price" => albums.OrderBy(a => a.Price),
+                _ => albums.OrderBy(a => a.Title)
+            };
+
+            return Ok(sortedAlbums);
+        }
     }
 }
